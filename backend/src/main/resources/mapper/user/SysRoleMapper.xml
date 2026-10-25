@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.courseshare.user.mapper.SysRoleMapper">
+    <select id="selectActiveByCodes" resultType="com.courseshare.user.entity.SysRole">
+        SELECT id, code, name, description, status, created_at, updated_at
+        FROM sys_role
+        WHERE status = 1
+          AND code IN
+        <foreach collection="codes" item="code" open="(" separator="," close=")">
+            #{code}
+        </foreach>
+        ORDER BY id
+    </select>
+</mapper>
+

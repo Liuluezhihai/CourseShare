@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.courseshare.resource.mapper.CmsArticleMapper">
+    <sql id="listColumns">
+        a.id,
+        a.title,
+        a.summary,
+        a.category_id,
+        c.name AS category_name,
+        a.author_id,
+        u.nickname AS author_name,
+        a.attachment_name,
+        a.attachment_ext,
+        a.attachment_size,
+        a.status,
+        a.view_count,
+        a.download_count,
+        a.published_at,
+        a.created_at,
+        a.updated_at,
+        a.version
+    </sql>
+
+    <select id="selectResourcePage" resultType="com.courseshare.resource.vo.ResourceListItemVO">
+        SELECT
+        <include refid="listColumns"/>
+        FROM cms_article a
+        INNER JOIN sys_user u ON u.id = a.author_id
+        LEFT JOIN cms_category c ON c.id = a.category_id
+        WHERE a.deleted = 0
+        <if test="publicOnly">
+            AND a.status = 2
+            AND c.status = 1
+            AND c.deleted = 0
+        </if>
+        <if test="query.authorId != null">
+            AND a.author_id = #{query.authorId}
+        </if>
+        <if test="query.status != null and !publicOnly">
+            AND a.status = #{query.status}
+        </if>
+        <if test="query.keyword != null and query.keyword != ''">
+            AND (a.title LIKE CONCAT('%', #{query.keyword}, '%')
+                 OR a.summary LIKE CONCAT('%', #{query.keyword}, '%'))
+        </if>
+        <if test="categoryIds != null and categoryIds.size() > 0">
+            AND a.category_id IN
+            <foreach collection="categoryIds" item="categoryId" open="(" separator="," close=")">
+                #{categoryId}
+            </foreach>
+        </if>
+        <if test="query.dateFrom != null">
+            AND a.created_at &gt;= #{query.dateFrom}
+        </if>
+        <if test="query.dateTo != null">
+            AND a.created_at &lt; DATE_ADD(#{query.dateTo}, INTERVAL 1 DAY)
+        </if>
+        ORDER BY
+        <choose>
+            <when test="query.sortBy == 'viewCount'">a.view_count</when>
+            <when test="query.sortBy == 'downloadCount'">a.download_count</when>
+            <when test="query.sortBy == 'updatedAt'">a.updated_at</when>
+            <when test="query.sortBy == 'createdAt'">a.created_at</when>
+            <otherwise>a.published_at</otherwise>
+        </choose>
+        <choose>
+            <when test="query.sortDirection == 'asc'">ASC</when>
+            <otherwise>DESC</otherwise>
+        </choose>
+        , a.id DESC
+    </select>
+
+    <select id="selectResourceDetail" resultType="com.courseshare.resource.vo.ResourceDetailVO">
+        SELECT
+            a.id,
+            a.title,
+            a.summary,
+            a.content,
+            a.category_id,
+            c.name AS category_name,
+            a.author_id,
+            u.nickname AS author_name,
+            a.attachment_name,
+            a.attachment_ext,
+            a.attachment_mime,
+            a.attachment_size,
+            a.status,
+            a.audit_by,
+            auditor.nickname AS auditor_name,
+            a.audit_at,
+            a.audit_remark,
+            a.published_at,
+            a.view_count,
+            a.download_count,
+            a.created_at,
+            a.updated_at,
+            a.version
+        FROM cms_article a
+        INNER JOIN sys_user u ON u.id = a.author_id
+        LEFT JOIN sys_user auditor ON auditor.id = a.audit_by
+        LEFT JOIN cms_category c ON c.id = a.category_id
+        WHERE a.id = #{id}
+          AND a.deleted = 0
+        <if test="publicOnly">
+            AND a.status = 2
+            AND c.status = 1
+            AND c.deleted = 0
+        </if>
+    </select>
+
+    <select id="selectDiscoverPage" resultType="com.courseshare.resource.vo.DiscoverResourceVO">
+        SELECT
+            a.id,
+            a.title,
+            a.summary,
+            a.category_id,
+            c.name AS category_name,
+            a.author_id,
+            u.nickname AS author_name,
+            a.attachment_name,
+            a.attachment_ext,
+            a.attachment_size,
+            a.status,
+            a.view_count,
+            a.download_count,
+            a.published_at,
+            a.created_at,
+            a.updated_at,
+            a.version,
+            COALESCE(r.average_rating, 0.0) AS average_rating,
+            COALESCE(r.rating_count, 0) AS rating_count,
+            COALESCE(f.favorite_count, 0) AS favorite_count,
+            COALESCE(l.review_like_count, 0) AS review_like_count,
+            (
+                a.view_count
+                + a.download_count * 5
+                + COALESCE(f.favorite_count, 0) * 10
+                + COALESCE(r.rating_count, 0) * 8
+                + COALESCE(l.review_like_count, 0) * 2
+            ) AS popular_score
+        FROM cms_article a
+        INNER JOIN sys_user u ON u.id = a.author_id
+        INNER JOIN cms_category c ON c.id = a.category_id AND c.status = 1 AND c.deleted = 0
+        LEFT JOIN (
+            SELECT resource_id, COUNT(*) AS favorite_count
+            FROM cms_resource_favorite
+            GROUP BY resource_id
+        ) f ON f.resource_id = a.id
+        LEFT JOIN (
+            SELECT resource_id, COUNT(*) AS rating_count, ROUND(AVG(score), 1) AS average_rating
+            FROM cms_resource_review
+            WHERE status = 1
+            GROUP BY resource_id
+        ) r ON r.resource_id = a.id
+        LEFT JOIN (
+            SELECT resource_id, SUM(like_count) AS review_like_count
+            FROM cms_resource_review
+            WHERE status = 1
+            GROUP BY resource_id
+        ) l ON l.resource_id = a.id
+        WHERE a.deleted = 0
+          AND a.status = 2
+        <if test="sort == 'rating'">
+            AND COALESCE(r.rating_count, 0) &gt; 0
+        </if>
+        <if test="sort == 'likes'">
+            AND COALESCE(l.review_like_count, 0) &gt; 0
+        </if>
+        ORDER BY
+        <choose>
+            <when test="sort == 'latest'">a.published_at DESC</when>
+            <when test="sort == 'rating'">COALESCE(r.average_rating, 0) DESC, COALESCE(r.rating_count, 0) DESC</when>
+            <when test="sort == 'likes'">COALESCE(l.review_like_count, 0) DESC</when>
+            <otherwise>
+                a.view_count
+                + a.download_count * 5
+                + COALESCE(f.favorite_count, 0) * 10
+                + COALESCE(r.rating_count, 0) * 8
+                + COALESCE(l.review_like_count, 0) * 2 DESC
+            </otherwise>
+        </choose>
+        , a.published_at DESC, a.id DESC
+    </select>
+
+    <update id="incrementViewCount">
+        UPDATE cms_article
+        SET view_count = view_count + 1
+        WHERE id = #{id}
+          AND status = 2
+          AND deleted = 0
+    </update>
+
+    <update id="incrementDownloadCount">
+        UPDATE cms_article
+        SET download_count = download_count + 1
+        WHERE id = #{id}
+          AND status = 2
+          AND deleted = 0
+    </update>
+
+    <update id="batchPublish">
+        UPDATE cms_article
+        SET status = 2,
+            audit_by = #{auditBy},
+            audit_at = #{now},
+            published_at = #{now},
+            updated_at = #{now},
+            version = version + 1
+        WHERE deleted = 0
+          AND status = 1
+          AND (id, version) IN
+        <foreach collection="items" item="item" open="(" separator="," close=")">
+            (#{item.id}, #{item.version})
+        </foreach>
+    </update>
+</mapper>
+

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.courseshare.interaction.mapper.ResourceFavoriteMapper">
+
+    <insert id="insertIgnore">
+        INSERT IGNORE INTO cms_resource_favorite (user_id, resource_id, created_at)
+        VALUES (#{userId}, #{resourceId}, CURRENT_TIMESTAMP(3))
+    </insert>
+
+    <delete id="delete">
+        DELETE FROM cms_resource_favorite
+        WHERE user_id = #{userId}
+          AND resource_id = #{resourceId}
+    </delete>
+
+    <select id="selectResourceIds" resultType="java.lang.Long">
+        SELECT resource_id
+        FROM cms_resource_favorite
+        WHERE user_id = #{userId}
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="selectFavoritePage" resultType="com.courseshare.resource.vo.ResourceListItemVO">
+        SELECT
+            a.id,
+            a.title,
+            a.summary,
+            a.category_id,
+            c.name AS category_name,
+            a.author_id,
+            u.nickname AS author_name,
+            a.attachment_name,
+            a.attachment_ext,
+            a.attachment_size,
+            a.status,
+            a.view_count,
+            a.download_count,
+            a.published_at,
+            a.created_at,
+            a.updated_at,
+            a.version
+        FROM cms_resource_favorite f
+        INNER JOIN cms_article a ON a.id = f.resource_id AND a.deleted = 0 AND a.status = 2
+        INNER JOIN sys_user u ON u.id = a.author_id
+        INNER JOIN cms_category c ON c.id = a.category_id AND c.status = 1 AND c.deleted = 0
+        WHERE f.user_id = #{userId}
+        ORDER BY f.created_at DESC, a.id DESC
+    </select>
+</mapper>

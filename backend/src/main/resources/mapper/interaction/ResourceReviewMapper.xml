@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.courseshare.interaction.mapper.ResourceReviewMapper">
+
+    <select id="selectByResourceAndUser" resultType="com.courseshare.interaction.entity.ResourceReview">
+        SELECT r.id,
+               r.resource_id,
+               r.user_id,
+               r.score,
+               r.content,
+               r.status,
+               r.like_count,
+               r.created_at,
+               r.updated_at
+        FROM cms_resource_review r
+        WHERE r.resource_id = #{resourceId}
+          AND r.user_id = #{userId}
+    </select>
+
+    <select id="selectPublicPage" resultType="com.courseshare.interaction.vo.ReviewVO">
+        SELECT
+            r.id,
+            r.resource_id,
+            r.user_id,
+            u.nickname,
+            r.score,
+            r.content,
+            r.status,
+            r.like_count,
+            r.created_at,
+            r.updated_at,
+            CASE
+                WHEN #{viewerId} IS NULL THEN 0
+                WHEN EXISTS (
+                    SELECT 1
+                    FROM cms_review_like l
+                    WHERE l.review_id = r.id AND l.user_id = #{viewerId}
+                ) THEN 1
+                ELSE 0
+            END AS liked_by_me,
+            CASE
+                WHEN #{viewerId} IS NULL THEN 0
+                WHEN r.user_id = #{viewerId} THEN 1
+                ELSE 0
+            END AS mine
+        FROM cms_resource_review r
+        INNER JOIN sys_user u ON u.id = r.user_id
+        WHERE r.resource_id = #{resourceId}
+        <if test="!includeHidden">
+            AND r.status = 1
+        </if>
+        ORDER BY
+            CASE WHEN r.status = 1 THEN 0 ELSE 1 END,
+            r.like_count DESC,
+            r.created_at DESC,
+            r.id DESC
+    </select>
+
+    <select id="selectMine" resultType="com.courseshare.interaction.vo.ReviewVO">
+        SELECT
+            r.id,
+            r.resource_id,
+            r.user_id,
+            u.nickname,
+            r.score,
+            r.content,
+            r.status,
+            r.like_count,
+            r.created_at,
+            r.updated_at,
+            0 AS liked_by_me,
+            1 AS mine
+        FROM cms_resource_review r
+        INNER JOIN sys_user u ON u.id = r.user_id
+        WHERE r.resource_id = #{resourceId}
+          AND r.user_id = #{userId}
+    </select>
+
+    <select id="selectStats" resultType="com.courseshare.interaction.vo.ReviewStatsVO">
+        SELECT
+            COALESCE(ROUND(AVG(score), 1), 0.0) AS average_score,
+            COUNT(*) AS rating_count
+        FROM cms_resource_review
+        WHERE resource_id = #{resourceId}
+          AND status = 1
+    </select>
+
+    <select id="selectMyPage" resultType="com.courseshare.interaction.vo.MyReviewVO">
+        SELECT
+            r.id,
+            r.resource_id,
+            a.title AS resource_title,
+            a.status AS resource_status,
+            CASE WHEN a.deleted = 1 THEN 1 ELSE 0 END AS resource_deleted,
+            r.score,
+            r.content,
+            r.like_count,
+            r.status,
+            r.created_at,
+            r.updated_at
+        FROM cms_resource_review r
+        INNER JOIN cms_article a ON a.id = r.resource_id
+        WHERE r.user_id = #{userId}
+        ORDER BY r.updated_at DESC, r.id DESC
+    </select>
+
+    <update id="updateContent">
+        UPDATE cms_resource_review
+        SET score = #{score},
+            content = #{content},
+            updated_at = #{now}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateVisibility">
+        UPDATE cms_resource_review
+        SET status = #{status},
+            updated_at = CURRENT_TIMESTAMP(3)
+        WHERE id = #{id}
+    </update>
+
+    <update id="incrementLikeCount">
+        UPDATE cms_resource_review
+        SET like_count = like_count + 1
+        WHERE id = #{id}
+    </update>
+
+    <update id="decrementLikeCount">
+        UPDATE cms_resource_review
+        SET like_count = GREATEST(like_count - 1, 0)
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteByResourceAndUser">
+        DELETE FROM cms_resource_review
+        WHERE resource_id = #{resourceId}
+          AND user_id = #{userId}
+    </delete>
+</mapper>

@@ -1,0 +1,1269 @@
+openapi: 3.0.3
+info:
+  title: CourseShare API
+  version: 1.0.0
+  description: 学习资源分享平台 REST API。认证基于 HttpOnly Session Cookie。
+servers:
+  - url: http://localhost:8080/course-share/api
+    description: 本地 Tomcat
+security:
+  - cookieAuth: []
+paths:
+  /auth/register:
+    post:
+      tags: [认证]
+      summary: 注册
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/Success'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /auth/login:
+    post:
+      tags: [认证]
+      summary: 登录并轮换 Session
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 当前用户、角色和权限
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CurrentUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /auth/logout:
+    post:
+      tags: [认证]
+      summary: 退出登录
+      responses:
+        '204':
+          description: 已退出
+  /auth/me:
+    get:
+      tags: [认证]
+      summary: 当前用户
+      responses:
+        '200':
+          description: 当前用户
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CurrentUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /auth/author/enable:
+    post:
+      tags: [认证]
+      summary: 开通当前账号的创作功能
+      responses:
+        '200':
+          description: 更新后的当前用户
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CurrentUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /categories/tree:
+    get:
+      tags: [分类]
+      summary: 启用分类树
+      security: []
+      responses:
+        '200':
+          description: 分类树
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/CategoryNode'
+  /resources:
+    get:
+      tags: [资源门户]
+      summary: 公开资源分页
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/Keyword'
+        - $ref: '#/components/parameters/CategoryId'
+        - $ref: '#/components/parameters/AuthorId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - $ref: '#/components/parameters/SortBy'
+        - $ref: '#/components/parameters/SortDirection'
+      responses:
+        '200':
+          $ref: '#/components/responses/ResourcePage'
+  /resources/{id}:
+    get:
+      tags: [资源门户]
+      summary: 已发布资源详情
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          $ref: '#/components/responses/ResourceDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /resources/{id}/download:
+    get:
+      tags: [资源门户]
+      summary: 下载附件
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: 附件二进制流
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /author/resources:
+    get:
+      tags: [作者资源]
+      summary: 作者资源分页
+      parameters:
+        - $ref: '#/components/parameters/Keyword'
+        - $ref: '#/components/parameters/CategoryId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - $ref: '#/components/parameters/Status'
+      responses:
+        '200':
+          $ref: '#/components/responses/ResourcePage'
+    post:
+      tags: [作者资源]
+      summary: 新建草稿并上传可选附件
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '#/components/schemas/ResourceSaveRequest'
+                file:
+                  type: string
+                  format: binary
+            encoding:
+              data:
+                contentType: application/json
+      responses:
+        '201':
+          $ref: '#/components/responses/ResourceDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /author/resources/{id}:
+    get:
+      tags: [作者资源]
+      summary: 作者资源详情
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          $ref: '#/components/responses/ResourceDetail'
+    put:
+      tags: [作者资源]
+      summary: 编辑草稿、驳回或下架资源
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '#/components/schemas/ResourceSaveRequest'
+                file:
+                  type: string
+                  format: binary
+            encoding:
+              data:
+                contentType: application/json
+      responses:
+        '200':
+          $ref: '#/components/responses/ResourceDetail'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    delete:
+      tags: [作者资源]
+      summary: 逻辑删除可删除资源
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '204':
+          description: 已删除
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /author/resources/{id}/submit:
+    post:
+      tags: [作者资源]
+      summary: 提交审核
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        $ref: '#/components/requestBodies/Version'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /author/resources/{id}/withdraw:
+    post:
+      tags: [作者资源]
+      summary: 撤回待审核资源
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        $ref: '#/components/requestBodies/Version'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /author/resources/{id}/offline:
+    post:
+      tags: [作者资源]
+      summary: 作者下架已发布资源
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        $ref: '#/components/requestBodies/Version'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /admin/resources:
+    get:
+      tags: [资源审核]
+      summary: 审核资源分页
+      parameters:
+        - $ref: '#/components/parameters/Keyword'
+        - $ref: '#/components/parameters/CategoryId'
+        - $ref: '#/components/parameters/AuthorId'
+        - $ref: '#/components/parameters/Status'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          $ref: '#/components/responses/ResourcePage'
+  /admin/resources/{id}:
+    get:
+      tags: [资源审核]
+      summary: 管理端资源详情
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          $ref: '#/components/responses/ResourceDetail'
+    delete:
+      tags: [资源审核]
+      summary: 管理删除
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '204':
+          description: 已删除
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /admin/resources/{id}/download:
+    get:
+      tags: [资源审核]
+      summary: 下载待审或已发布资源的附件
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: 附件二进制流
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /admin/resources/{id}/approve:
+    post:
+      tags: [资源审核]
+      summary: 审核通过
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        $ref: '#/components/requestBodies/Version'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /admin/resources/{id}/reject:
+    post:
+      tags: [资源审核]
+      summary: 驳回资源
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version, remark]
+              properties:
+                version:
+                  type: integer
+                remark:
+                  type: string
+                  maxLength: 500
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /admin/resources/batch-publish:
+    post:
+      tags: [资源审核]
+      summary: 批量发布待审核资源
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  maxItems: 100
+                  items:
+                    $ref: '#/components/schemas/VersionEnvelope'
+      responses:
+        '200':
+          description: 发布数量
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: integer
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /admin/resources/{id}/offline:
+    post:
+      tags: [资源审核]
+      summary: 管理下架
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        $ref: '#/components/requestBodies/Version'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+  /admin/categories/tree:
+    get:
+      tags: [分类管理]
+      summary: 含停用分类的管理树
+      responses:
+        '200':
+          description: 分类树
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/CategoryNode'
+  /admin/categories:
+    post:
+      tags: [分类管理]
+      summary: 新增分类
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategorySaveRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/Success'
+  /admin/categories/{id}:
+    put:
+      tags: [分类管理]
+      summary: 编辑、排序或移动分类
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategorySaveRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    delete:
+      tags: [分类管理]
+      summary: 删除空分类
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '204':
+          description: 已删除
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /admin/categories/{id}/status:
+    patch:
+      tags: [分类管理]
+      summary: 启用或停用分类
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status, version]
+              properties:
+                status:
+                  type: integer
+                  enum: [0, 1]
+                version:
+                  type: integer
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+  /admin/users:
+    get:
+      tags: [用户管理]
+      summary: 用户分页
+      parameters:
+        - $ref: '#/components/parameters/Keyword'
+        - $ref: '#/components/parameters/Status'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 用户分页
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UserPage'
+  /admin/roles:
+    get:
+      tags: [用户管理]
+      summary: 启用角色选项
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+  /admin/users/{id}/roles:
+    put:
+      tags: [用户管理]
+      summary: 分配角色
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [roleCodes]
+              properties:
+                roleCodes:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /admin/users/{id}/status:
+    patch:
+      tags: [用户管理]
+      summary: 启停账号
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: integer
+                  enum: [0, 1]
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+  /admin/logs:
+    get:
+      tags: [操作日志]
+      summary: 操作日志分页
+      parameters:
+        - $ref: '#/components/parameters/Keyword'
+        - name: module
+          in: query
+          schema:
+            type: string
+        - name: userId
+          in: query
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/Status'
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+            format: date
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+  /discover/resources:
+    get:
+      tags: [Discover]
+      summary: 发现资源榜单
+      parameters:
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [latest, popular, rating, likes]
+            default: popular
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+  /resources/{id}/favorite:
+    put:
+      tags: [Favorites]
+      summary: 收藏资源
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+    delete:
+      tags: [Favorites]
+      summary: 取消收藏
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+  /me/favorites:
+    get:
+      tags: [Favorites]
+      summary: 当前用户收藏列表
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+  /me/favorite-ids:
+    get:
+      tags: [Favorites]
+      summary: 当前用户收藏资源 ID
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+  /resources/{id}/reviews:
+    get:
+      tags: [Reviews]
+      summary: 资源评价列表
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+  /resources/{id}/review:
+    put:
+      tags: [Reviews]
+      summary: 创建或更新自己的评价
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewSaveRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+    delete:
+      tags: [Reviews]
+      summary: 删除自己的评价
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+  /reviews/{id}/like:
+    put:
+      tags: [Reviews]
+      summary: 点赞评价
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+    delete:
+      tags: [Reviews]
+      summary: 取消评价点赞
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+  /me/reviews:
+    get:
+      tags: [Reviews]
+      summary: 当前用户全部评价
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+  /admin/reviews/{id}/visibility:
+    patch:
+      tags: [Admin Reviews]
+      summary: 隐藏或恢复评价
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [visible]
+              properties:
+                visible:
+                  type: boolean
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: CS_SESSION
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    Keyword:
+      name: keyword
+      in: query
+      schema:
+        type: string
+    CategoryId:
+      name: categoryId
+      in: query
+      schema:
+        type: integer
+        format: int64
+    AuthorId:
+      name: authorId
+      in: query
+      schema:
+        type: integer
+        format: int64
+    Status:
+      name: status
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        maximum: 4
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    Size:
+      name: size
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 10
+    SortBy:
+      name: sortBy
+      in: query
+      schema:
+        type: string
+        enum: [publishedAt, viewCount, downloadCount]
+        default: publishedAt
+    SortDirection:
+      name: sortDirection
+      in: query
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: desc
+  requestBodies:
+    Version:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VersionEnvelope'
+  responses:
+    Success:
+      description: 成功
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+    ResourcePage:
+      description: 资源分页
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ApiResponse'
+              - type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ResourcePage'
+    ResourceDetail:
+      description: 资源详情
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ApiResponse'
+              - type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ResourceDetail'
+    BadRequest:
+      description: 参数或文件不合法
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+    Unauthorized:
+      description: 未登录
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+    Forbidden:
+      description: 无权限
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+    NotFound:
+      description: 不存在
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+    Conflict:
+      description: 状态、版本或数据冲突
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+  schemas:
+    ApiResponse:
+      type: object
+      required: [code, message, requestId]
+      properties:
+        code:
+          type: string
+          example: SUCCESS
+        message:
+          type: string
+        data:
+          nullable: true
+        requestId:
+          type: string
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+          format: password
+    RegisterRequest:
+      type: object
+      required: [username, password, nickname]
+      properties:
+        username:
+          type: string
+          pattern: '^[A-Za-z0-9_]{4,30}$'
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 32
+        nickname:
+          type: string
+          maxLength: 50
+        email:
+          type: string
+          format: email
+          nullable: true
+        enableAuthor:
+          type: boolean
+          default: false
+    CurrentUser:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        username:
+          type: string
+        nickname:
+          type: string
+        email:
+          type: string
+          nullable: true
+        roles:
+          type: array
+          items:
+            type: string
+        permissions:
+          type: array
+          items:
+            type: string
+    CategoryNode:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        parentId:
+          type: integer
+          format: int64
+          nullable: true
+        name:
+          type: string
+        level:
+          type: integer
+        sortOrder:
+          type: integer
+        status:
+          type: integer
+        description:
+          type: string
+          nullable: true
+        version:
+          type: integer
+        resourceCount:
+          type: integer
+          format: int64
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategoryNode'
+    CategorySaveRequest:
+      type: object
+      required: [name]
+      properties:
+        parentId:
+          type: integer
+          format: int64
+          nullable: true
+        name:
+          type: string
+          maxLength: 50
+        description:
+          type: string
+          maxLength: 255
+        sortOrder:
+          type: integer
+          minimum: 0
+        status:
+          type: integer
+          enum: [0, 1]
+        version:
+          type: integer
+          nullable: true
+    ResourceSaveRequest:
+      type: object
+      required: [title, summary, content, categoryId]
+      properties:
+        title:
+          type: string
+          maxLength: 200
+        summary:
+          type: string
+          maxLength: 500
+        content:
+          type: string
+        categoryId:
+          type: integer
+          format: int64
+        version:
+          type: integer
+          nullable: true
+    VersionEnvelope:
+      type: object
+      required: [version]
+      properties:
+        id:
+          type: integer
+          format: int64
+        version:
+          type: integer
+    ResourceListItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        summary:
+          type: string
+        categoryId:
+          type: integer
+          format: int64
+        categoryName:
+          type: string
+        authorId:
+          type: integer
+          format: int64
+        authorName:
+          type: string
+        attachmentName:
+          type: string
+          nullable: true
+        attachmentExt:
+          type: string
+          nullable: true
+        attachmentSize:
+          type: integer
+          format: int64
+          nullable: true
+        status:
+          type: integer
+        viewCount:
+          type: integer
+          format: int64
+        downloadCount:
+          type: integer
+          format: int64
+        publishedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        version:
+          type: integer
+    ResourceDetail:
+      allOf:
+        - $ref: '#/components/schemas/ResourceListItem'
+        - type: object
+          properties:
+            content:
+              type: string
+            attachmentMime:
+              type: string
+              nullable: true
+            auditorName:
+              type: string
+              nullable: true
+            auditAt:
+              type: string
+              format: date-time
+              nullable: true
+            auditRemark:
+              type: string
+              nullable: true
+    ResourcePage:
+      type: object
+      properties:
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResourceListItem'
+        total:
+          type: integer
+          format: int64
+        page:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int64
+        pages:
+          type: integer
+          format: int64
+    DiscoverResource:
+      allOf:
+        - $ref: '#/components/schemas/ResourceListItem'
+        - type: object
+          properties:
+            averageRating:
+              type: number
+              format: double
+            ratingCount:
+              type: integer
+              format: int64
+            favoriteCount:
+              type: integer
+              format: int64
+            reviewLikeCount:
+              type: integer
+              format: int64
+            popularScore:
+              type: integer
+              format: int64
+    ReviewSaveRequest:
+      type: object
+      required: [score]
+      properties:
+        score:
+          type: integer
+          minimum: 1
+          maximum: 5
+        content:
+          type: string
+          maxLength: 500
+          nullable: true
+    ReviewItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        resourceId:
+          type: integer
+          format: int64
+        userId:
+          type: integer
+          format: int64
+        nickname:
+          type: string
+        score:
+          type: integer
+        content:
+          type: string
+          nullable: true
+        status:
+          type: integer
+        likeCount:
+          type: integer
+          format: int64
+        likedByMe:
+          type: boolean
+        mine:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ReviewPage:
+      type: object
+      properties:
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReviewItem'
+        total:
+          type: integer
+          format: int64
+        page:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int64
+        pages:
+          type: integer
+          format: int64
+    ReviewFeed:
+      type: object
+      properties:
+        reviews:
+          $ref: '#/components/schemas/ReviewPage'
+        averageScore:
+          type: number
+          format: double
+        ratingCount:
+          type: integer
+          format: int64
+        mine:
+          allOf:
+            - $ref: '#/components/schemas/ReviewItem'
+          nullable: true
+    MyReviewItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        resourceId:
+          type: integer
+          format: int64
+        resourceTitle:
+          type: string
+        resourceStatus:
+          type: integer
+        resourceDeleted:
+          type: boolean
+        score:
+          type: integer
+        content:
+          type: string
+          nullable: true
+        likeCount:
+          type: integer
+          format: int64
+        status:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    UserPage:
+      type: object
+      properties:
+        records:
+          type: array
+          items:
+            type: object
+        total:
+          type: integer
+          format: int64
+        page:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int64
+        pages:
+          type: integer
+          format: int64
+

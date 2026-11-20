@@ -1,0 +1,7 @@
+{
+  "title": "Attachment Integration",
+  "summary": "Verify multipart upload and download",
+  "content": "# Uploaded file test\n\nThis resource verifies the attachment lifecycle.",
+  "categoryId": 6
+}
+
